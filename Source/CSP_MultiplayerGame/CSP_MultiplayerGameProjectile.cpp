@@ -87,7 +87,6 @@ void ACSP_MultiplayerGameProjectile::ArmBomb() {
 	if (bIsArmed) {
 		//change color to red
 		UMaterialInstanceDynamic* DynamicMAT = SM->CreateAndSetMaterialInstanceDynamic(0);
-
 		DynamicMAT->SetVectorParameterValue(FName("Color"), FLinearColor::Red);
 	}
 }
@@ -109,7 +108,6 @@ void ACSP_MultiplayerGameProjectile::Explode() {
 
 	//this will call the take damage function in character
 	UGameplayStatics::ApplyRadialDamage(GetWorld(), ExplosionDamage, GetActorLocation(), ExplosionRadius, DmgType, IgnoreActors, this, GetInstigatorController());
-	
 	if (Role == ROLE_Authority) {
 		//destroy projectile
 		Destroy();
@@ -120,6 +118,7 @@ void ACSP_MultiplayerGameProjectile::Explode() {
 void ACSP_MultiplayerGameProjectile::PerformDelayedExplosion(float ExplosionDelay) {
 	FTimerHandle TimerHandle;
 	FTimerDelegate TimerDel;
+	TimerDel.BindUFunction(this, FName("Explode"));
 
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDel, ExplosionDelay, false);
 }
