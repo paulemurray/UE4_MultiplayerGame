@@ -40,9 +40,12 @@ public:
 	FORCEINLINE class UProjectileMovementComponent* GetProjectileMovement() const { return ProjectileMovement; }
 
 protected:
+	//called when actor starts
+	void BeginPlay() override;
+
 	//delay until explosion
 	UPROPERTY(EditAnywhere, Category = BombProps)
-		float FuseTime = 2.5f;
+		float FuseTime = .5f;
 
 	UPROPERTY(EditAnywhere, Category = BombProps)
 		float ExplosionRadius = 200.f;

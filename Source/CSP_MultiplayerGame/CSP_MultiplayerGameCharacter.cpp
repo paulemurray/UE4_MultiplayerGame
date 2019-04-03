@@ -8,6 +8,7 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/InputSettings.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 
@@ -24,7 +25,7 @@ ACSP_MultiplayerGameCharacter::ACSP_MultiplayerGameCharacter()
 	// Create a CameraComponent	
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
 	FirstPersonCameraComponent->SetupAttachment(GetCapsuleComponent());
-	FirstPersonCameraComponent->RelativeLocation = FVector(-39.56f, 1.75f, 84.f); // Position the camera
+	FirstPersonCameraComponent->RelativeLocation = FVector(-39.56f, 1.75f, 41.f); // Position the camera
 	FirstPersonCameraComponent->bUsePawnControlRotation = true;
 
 	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
@@ -41,12 +42,20 @@ ACSP_MultiplayerGameCharacter::ACSP_MultiplayerGameCharacter()
 	FP_Gun->SetOnlyOwnerSee(true);			// only the owning player will see this mesh
 	FP_Gun->bCastDynamicShadow = false;
 	FP_Gun->CastShadow = false;
-	// FP_Gun->SetupAttachment(Mesh1P, TEXT("GripPoint"));
+	FP_Gun->SetupAttachment(Mesh1P, TEXT("GripPoint"));
 	FP_Gun->SetupAttachment(RootComponent);
 
 	FP_MuzzleLocation = CreateDefaultSubobject<USceneComponent>(TEXT("MuzzleLocation"));
 	FP_MuzzleLocation->SetupAttachment(FP_Gun);
 	FP_MuzzleLocation->SetRelativeLocation(FVector(0.2f, 48.4f, -10.6f));
+
+
+	TP_Gun = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("TP_Gun"));
+	TP_Gun->SetOwnerNoSee(true);
+	TP_Gun->bCastDynamicShadow = true;
+	TP_Gun->CastShadow = true;
+	FP_Gun->SetupAttachment(GetMesh(), TEXT("GripPoint"));
+	TP_Gun->SetRelativeLocation(FVector(0.f, 0.f, 286.f));
 
 	// Default offset from the character location for projectiles to spawn
 	GunOffset = FVector(100.0f, 0.0f, 10.0f);
@@ -61,7 +70,7 @@ ACSP_MultiplayerGameCharacter::ACSP_MultiplayerGameCharacter()
 	//hide third person mesh
 	GetMesh()->SetOwnerNoSee(true);
 
-	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -65.f));
+	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -98.f));
 	GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 }
 
@@ -72,6 +81,9 @@ void ACSP_MultiplayerGameCharacter::BeginPlay()
 
 	//Attach gun mesh component to Skeleton, doing it here because the skeleton is not yet created in the constructor
 	FP_Gun->AttachToComponent(Mesh1P, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
+
+	//Attach gun mesh component to Skeleton, doing it here because the skeleton is not yet created in the constructor
+	TP_Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
 
 	InitHealth();
 	InitBombCount();
@@ -104,7 +116,20 @@ void ACSP_MultiplayerGameCharacter::SetupPlayerInputComponent(class UInputCompon
 
 void ACSP_MultiplayerGameCharacter::OnFire()
 {
-	// try and fire a projectile
+	if (HasBombs()) {
+		if (Role < ROLE_Authority) {
+			//request projectile spawn
+			ServerSpawnProjectile();
+		}
+		else {
+			SpawnProjectile();
+		}
+		BombCount--;
+	}
+}
+
+void ACSP_MultiplayerGameCharacter::SpawnProjectile() {
+	//try to spawn projectile
 	if (ProjectileClass != NULL)
 	{
 		UWorld* const World = GetWorld();
@@ -117,15 +142,13 @@ void ACSP_MultiplayerGameCharacter::OnFire()
 			//Set Spawn Collision Handling Override
 			FActorSpawnParameters ActorSpawnParams;
 			ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+			ActorSpawnParams.Instigator = this;
+			ActorSpawnParams.Owner = GetController();
 
 			// spawn the projectile at the muzzle
 			World->SpawnActor<ACSP_MultiplayerGameProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, ActorSpawnParams);
-
-			//decrease BombCount
-			BombCount--;
 		}
 	}
-
 	// try and play the sound if specified
 	if (FireSound != NULL)
 	{
@@ -144,6 +167,14 @@ void ACSP_MultiplayerGameCharacter::OnFire()
 	}
 }
 
+void ACSP_MultiplayerGameCharacter::ServerSpawnProjectile_Implementation() {
+	SpawnProjectile();
+}
+
+bool ACSP_MultiplayerGameCharacter::ServerSpawnProjectile_Validate() {
+	//its okay lol
+	return true;
+}
 
 void ACSP_MultiplayerGameCharacter::MoveForward(float Value) {
 	if (Value != 0.0f)
@@ -226,26 +257,5 @@ void ACSP_MultiplayerGameCharacter::ServerTakeDamage_Implementation(float Damage
 
 bool ACSP_MultiplayerGameCharacter::ServerTakeDamage_Validate(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) {
 	//assume everything is okay
-	return true;
-}
-
-void ACSP_MultiplayerGameCharacter::AttemptToSpawnBomb() {
-	if (HasBombs()) {
-		//if we dont have authority (not the server), tell server
-		//to spawn bomb
-		//if we are the server just spawn a bomb
-		if (Role < ROLE_Authority) {
-			ServerSpawnBomb();
-		}
-		else OnFire();
-	}
-}
-
-void ACSP_MultiplayerGameCharacter::ServerSpawnBomb_Implementation() {
-	OnFire();
-}
-
-bool ACSP_MultiplayerGameCharacter::ServerSpawnBomb_Validate() {
-	//assume OK
 	return true;
 }

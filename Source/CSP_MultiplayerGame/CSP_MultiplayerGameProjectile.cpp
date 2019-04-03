@@ -2,6 +2,8 @@
 
 #include "CSP_MultiplayerGameProjectile.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Classes/Materials/MaterialInstanceDynamic.h"
+#include "Engine.h"
 #include "Components/SphereComponent.h"
 
 ACSP_MultiplayerGameProjectile::ACSP_MultiplayerGameProjectile() 
@@ -30,14 +32,39 @@ ACSP_MultiplayerGameProjectile::ACSP_MultiplayerGameProjectile()
 	//initialize static mesh
 	SM = CreateDefaultSubobject<UStaticMeshComponent>(FName("SM"));
 	SM->SetupAttachment(CollisionComp);
+
+	//replication
+	SetRemoteRoleForBackwardsCompat(ROLE_SimulatedProxy);
+	bReplicates = true;
+	bReplicateMovement = true;
+}
+
+void ACSP_MultiplayerGameProjectile::BeginPlay() {
+	Super::BeginPlay();
+
+	FTimerHandle TimHan;
+	FTimerDelegate TimDel;
+	TimDel.BindLambda([&] () {
+		//if not armed and we are the server, arm and explode
+		if (!bIsArmed && Role == ROLE_Authority) {
+			bIsArmed = true;
+			ArmBomb();
+			Explode();
+		}
+
+	});
+
+	GetWorld()->GetTimerManager().SetTimer(TimHan, TimDel, .80f, false);
 }
 
 void ACSP_MultiplayerGameProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	// Only add impulse and destroy projectile if we hit a physics
-	if ((OtherActor != NULL) && (OtherActor != this) && (OtherComp != NULL) && OtherComp->IsSimulatingPhysics())
-	{
-		OtherComp->AddImpulseAtLocation(GetVelocity() * 100.0f, GetActorLocation());
+	if ((OtherActor != NULL) && (OtherActor != this) && (OtherComp != NULL)) { 
+		//if object simulates physics, move it
+		if (OtherComp->IsSimulatingPhysics() && Role == ROLE_Authority) {
+			OtherComp->AddImpulseAtLocation(GetVelocity() * 100.0f, GetActorLocation());
+		}
 
 		//if not armed and we are the server, arm and explode
 		if (!bIsArmed && Role == ROLE_Authority) {
@@ -46,8 +73,6 @@ void ACSP_MultiplayerGameProjectile::OnHit(UPrimitiveComponent* HitComp, AActor*
 
 			PerformDelayedExplosion(FuseTime);
 		}
-
-		Destroy();
 	}
 }
 
@@ -84,14 +109,17 @@ void ACSP_MultiplayerGameProjectile::Explode() {
 
 	//this will call the take damage function in character
 	UGameplayStatics::ApplyRadialDamage(GetWorld(), ExplosionDamage, GetActorLocation(), ExplosionRadius, DmgType, IgnoreActors, this, GetInstigatorController());
+	
+	if (Role == ROLE_Authority) {
+		//destroy projectile
+		Destroy();
+	}
 }
 
 //explode after set time
 void ACSP_MultiplayerGameProjectile::PerformDelayedExplosion(float ExplosionDelay) {
 	FTimerHandle TimerHandle;
-
 	FTimerDelegate TimerDel;
-	TimerDel.BindUFunction(this, FName("Explode"));
 
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, TimerDel, ExplosionDelay, false);
 }

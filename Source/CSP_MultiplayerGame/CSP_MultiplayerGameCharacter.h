@@ -23,6 +23,10 @@ class ACSP_MultiplayerGameCharacter : public ACharacter
 	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
 	class USkeletalMeshComponent* FP_Gun;
 
+	//third person gun mesh
+	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
+		class USkeletalMeshComponent* TP_Gun;
+
 	/** Location on gun mesh where projectiles should spawn. */
 	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
 	class USceneComponent* FP_MuzzleLocation;
@@ -66,6 +70,16 @@ protected:
 	
 	/** Fires a projectile. */
 	void OnFire();
+
+	//spawn projctile
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerSpawnProjectile();
+
+	void ServerSpawnProjectile_Implementation();
+
+	bool ServerSpawnProjectile_Validate();
+
+	void SpawnProjectile();
 
 	/** Handles moving forward/backward */
 	void MoveForward(float Val);
@@ -111,7 +125,7 @@ protected:
 
 	//max number of bombs the player can have
 	UPROPERTY(EditAnywhere, Category = Stats)
-		int32 MaxBombCount = 3;
+		int32 MaxBombCount = 6;
 
 	//text render component
 	UPROPERTY(VisibleAnywhere)
@@ -149,23 +163,8 @@ private:
 
 	bool ServerTakeDamage_Validate(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser);
 
-	//bomb spawning functions
-
-	//try to spawn bomb
-	void AttemptToSpawnBomb();
-
 	//returns true if we can spawn a bomb
 	bool HasBombs() { return BombCount > 0; }
-
-	//spawnbomb server function, use this for clients
-	UFUNCTION(Server, Reliable, WithValidation)
-		void ServerSpawnBomb();
-
-	//implementation
-	void ServerSpawnBomb_Implementation();
-
-	//validates, if false client gets disconnected
-	bool ServerSpawnBomb_Validate();
 
 public:
 	//applied damage to character
