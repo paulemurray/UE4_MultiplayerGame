@@ -55,7 +55,7 @@ ACSP_MultiplayerGameCharacter::ACSP_MultiplayerGameCharacter()
 	TP_Gun->bCastDynamicShadow = true;
 	TP_Gun->CastShadow = true;
 	FP_Gun->SetupAttachment(GetMesh(), TEXT("GripPoint"));
-	TP_Gun->SetRelativeLocation(FVector(0.f, 0.f, 286.f));
+	TP_Gun->SetRelativeRotation(FRotator(0.f, 0.f, 286.f));
 
 	// Default offset from the character location for projectiles to spawn
 	GunOffset = FVector(100.0f, 0.0f, 10.0f);
@@ -234,7 +234,7 @@ void ACSP_MultiplayerGameCharacter::UpdateCharText() {
 	//create a string to show health and bomb values
 	FString NewText = FString("Health: ") + FString::SanitizeFloat(Health) + FString(" Bomb Count: ") + FString::FromInt(BombCount);
 	//set the created string to the text render comp
-	CharText->SetText(FText::FromString(NewText));
+	//CharText->SetText(FText::FromString(NewText));
 }
 
 float ACSP_MultiplayerGameCharacter::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) {
